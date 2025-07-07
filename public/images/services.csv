@@ -1,0 +1,5 @@
+ID,ServiceDate,ServiceCategory,ServiceName,ServiceDescription,SalePrice,DiscountedPrice,HSNCode,ProcessingDays,RequiredDocuments
+SER064,26 Feb 2025,Taxation,service1,desc,1000,899,abc123,7,1
+SER065,26 Feb 2025,Taxation,service2,desc,5000,4899,abc321,10,0
+SER066,28 Feb 2025,Personal Loan,loan1,desc,1000,1000,abc123,7,1
+SER067,28 Feb 2025,Life Insurance,insurance1,desc,2000,1899,dec123,8,1

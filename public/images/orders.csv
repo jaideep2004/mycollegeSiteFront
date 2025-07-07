@@ -1,0 +1,3 @@
+Order ID,Order Date,Customer ID,Customer Name,Customer Email,Customer Mobile Number,Employee Code,Employee Assigned,L1 Employee Code,L1 Employee Name,Service Name,Service Price,Discounts,IGST Amount,CGST Amount,SGST Amount,Total Order Value,Order Status,Order Completion Date,Days Delayed,Payment Status,Rating,Payment Method
+ORDERCUS177-0432529,10 Mar 2025,CUS177,"new customer ",jai@gmail.com,8360703621,EMP096,emp1@gmail.com,EMP096,emp1@gmail.com,service1,899,0,0,0,0,899,In Process,10 Mar 2025,0,"success,success",N/A,"card,card"
+ORDERCUS177-6504470,10 Mar 2025,CUS177,"new customer ",jai@gmail.com,8360703621,,,,,loan1,1000,0,0,0,0,1000,In Process,10 Mar 2025,0,"success,success",N/A,"card,card"
