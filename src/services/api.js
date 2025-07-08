@@ -11,7 +11,7 @@ const API = axios.create({
 // Function to keep backend awake
 const keepBackendAwake = () => {
 	console.log("Pinging backend to keep it awake");
-	axios.get("https://mycollegesitebackend.onrender.com/health")
+	axios.get("https://mycollegesitebackend.onrender.com")
 		.then(() => console.log("Backend ping successful"))
 		.catch(error => console.log("Backend ping failed, but this is okay"));
 };
