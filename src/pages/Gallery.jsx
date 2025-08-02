@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
 	Box,
 	Container,
@@ -33,6 +33,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import api from '../services/api';
+import GalleryUpload from '../components/GalleryUpload';
 
 // Styled components
 const PageBanner = styled(Box)(({ theme }) => ({
@@ -128,6 +129,7 @@ const Gallery = () => {
 		message: '',
 		severity: 'success',
 	});
+	const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
 	useEffect(() => {
 		const fetchImages = async () => {
@@ -253,6 +255,24 @@ const Gallery = () => {
 		setSnackbar(prev => ({ ...prev, open: false }));
 	};
 
+	const handleOpenUploadDialog = () => {
+		setUploadDialogOpen(true);
+	};
+
+	const handleCloseUploadDialog = () => {
+		setUploadDialogOpen(false);
+	};
+
+	const handleUploadSuccess = useCallback(() => {
+		// Refresh the gallery after successful upload
+		fetchImages();
+		setSnackbar({
+			open: true,
+			message: 'Images uploaded successfully!',
+			severity: 'success',
+		});
+	}, []);
+
 	// Calculate pagination
 	const displayedImages = filteredImages.slice(0, page * imagesPerPage);
 	const hasMore = displayedImages.length < filteredImages.length;
@@ -262,12 +282,25 @@ const Gallery = () => {
 			{/* Banner Section */}
 			<PageBanner>
 				<Container>
-					<Typography variant="h3" component="h1" gutterBottom fontWeight="bold">
-						Our Gallery
-					</Typography>
-					<Typography variant="h6" sx={{ maxWidth: 700, mx: 'auto', mb: 4 }}>
-						Explore our campus life, events, and student activities through our photo gallery.
-					</Typography>
+					<Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap">
+						<Box>
+							<Typography variant="h3" component="h1" gutterBottom fontWeight="bold">
+								Our Gallery
+							</Typography>
+							<Typography variant="h6" sx={{ maxWidth: 700, mb: 4 }}>
+								Explore our campus life, events, and student activities through our photo gallery.
+							</Typography>
+						</Box>
+						<Button 
+							variant="contained" 
+							color="primary" 
+							startIcon={<CloudUploadIcon />}
+							onClick={handleOpenUploadDialog}
+							sx={{ mt: 2 }}
+						>
+							Upload Images
+						</Button>
+					</Box>
 				</Container>
 			</PageBanner>
 
@@ -426,6 +459,13 @@ const Gallery = () => {
 					{snackbar.message}
 				</Alert>
 			</Snackbar>
+
+			{/* Gallery Upload Dialog */}
+			<GalleryUpload 
+				open={uploadDialogOpen}
+				onClose={handleCloseUploadDialog}
+				onUploadSuccess={handleUploadSuccess}
+			/>
 		</Box>
 	);
 };

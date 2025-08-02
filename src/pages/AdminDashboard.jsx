@@ -24,6 +24,7 @@ import {
 	TableHead,
 	IconButton,
 	Divider,
+	LinearProgress,
 } from "@mui/material";
 import api from "../services/api";
 import { showSuccessToast, showErrorToast } from "../utils/toast";
@@ -97,6 +98,8 @@ const AdminDashboard = () => {
 	const [editingCourse, setEditingCourse] = useState(null);
 	const [galleryCategories, setGalleryCategories] = useState([]);
 	const [selectedGalleryCategory, setSelectedGalleryCategory] = useState("");
+	const [selectedFiles, setSelectedFiles] = useState(null);
+	const [uploadProgress, setUploadProgress] = useState([]);
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const navigate = useNavigate();
 
@@ -1080,15 +1083,140 @@ const AdminDashboard = () => {
 	};
 
 	const handleContentFileChange = (e) => {
-		if (e.target.files && e.target.files[0]) {
-			const file = e.target.files[0];
+		if (e.target.files && e.target.files.length > 0) {
+			if (contentForm.type === 'gallery') {
+				// Handle multiple files for gallery
+				setSelectedFiles(e.target.files);
+				// Clear any previous upload progress
+				setUploadProgress([]);
+			} else {
+				// Handle single file for other content types
+				const file = e.target.files[0];
+				setContentForm({
+					...contentForm,
+					file: file,
+					filePreview: URL.createObjectURL(file)
+				});
+			}
+		}
+	};
+
+	const handleBulkGalleryUpload = async () => {
+		if (!selectedFiles || selectedFiles.length === 0) {
+			showErrorToast('Please select images to upload');
+			return;
+		}
+
+		if (!selectedGalleryCategory) {
+			showErrorToast('Please select a gallery category');
+			return;
+		}
+
+		setLoading(true);
+		try {
+			const files = Array.from(selectedFiles);
+			const totalFiles = files.length;
 			
-			// Set file and preview in form
-			setContentForm({
-				...contentForm,
-				file: file,
-				filePreview: URL.createObjectURL(file)
-			});
+			// Initialize progress tracking
+			const initialProgress = files.map((file, index) => ({
+				fileName: file.name,
+				progress: 0,
+				status: 'uploading'
+			}));
+			setUploadProgress(initialProgress);
+
+			// Get category info
+			const category = galleryCategories.find(cat => cat._id === selectedGalleryCategory);
+			if (!category) {
+				showErrorToast('Selected category not found');
+				return;
+			}
+
+			let successCount = 0;
+			let failCount = 0;
+
+			// Upload files one by one
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i];
+				try {
+					const formData = new FormData();
+					formData.append('file', file);
+					formData.append('type', 'gallery');
+					formData.append('title', contentForm.title || file.name.split('.')[0]);
+					formData.append('description', contentForm.description || '');
+					formData.append('category', selectedGalleryCategory);
+					formData.append('categoryName', category.title);
+
+					// Upload with progress tracking
+					const response = await api.admin.uploadGalleryImage(formData, (progressEvent) => {
+						if (progressEvent.lengthComputable) {
+							const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+							setUploadProgress(prev => prev.map((item, index) => 
+								index === i ? { ...item, progress: percentCompleted } : item
+							));
+						}
+					});
+
+					if (response.data || response.success) {
+						successCount++;
+						setUploadProgress(prev => prev.map((item, index) => 
+							index === i ? { ...item, progress: 100, status: 'success' } : item
+						));
+					} else {
+						failCount++;
+						setUploadProgress(prev => prev.map((item, index) => 
+							index === i ? { ...item, status: 'error' } : item
+						));
+					}
+				} catch (error) {
+					console.error(`Error uploading ${file.name}:`, error);
+					failCount++;
+					setUploadProgress(prev => prev.map((item, index) => 
+						index === i ? { ...item, status: 'error' } : item
+					));
+				}
+			}
+
+			// Show summary
+			if (successCount > 0) {
+				showSuccessToast(`Successfully uploaded ${successCount} of ${totalFiles} images`);
+			}
+			if (failCount > 0) {
+				showErrorToast(`Failed to upload ${failCount} images`);
+			}
+
+			// Reset form and refresh content
+			if (successCount > 0) {
+				setContentForm({
+					type: '',
+					title: '',
+					description: '',
+					category: '',
+					file: null,
+					filePreview: null,
+					courseId: '',
+				});
+				setSelectedGalleryCategory('');
+				setSelectedFiles(null);
+				
+				// Clear file input
+				const fileInput = document.querySelector('#file-upload');
+				if (fileInput) fileInput.value = '';
+				
+				// Force refresh content list
+				setRefreshTrigger(prev => prev + 1);
+			}
+
+			// Clear progress after a delay
+			setTimeout(() => {
+				setUploadProgress([]);
+			}, 3000);
+
+		} catch (error) {
+			console.error('Error in bulk gallery upload:', error);
+			showErrorToast('Failed to upload images: ' + (error.message || 'Unknown error'));
+		} finally {
+			setLoading(false);
 		}
 	};
 
@@ -1353,6 +1481,36 @@ const AdminDashboard = () => {
 											</Box>
 										)}
 										
+										{contentForm.type === 'gallery' && (
+											<FormControl fullWidth sx={{ mb: 2 }}>
+												<InputLabel>Gallery Category</InputLabel>
+												<Select
+													value={selectedGalleryCategory}
+													onChange={(e) => setSelectedGalleryCategory(e.target.value)}
+													label="Gallery Category"
+													required
+													error={!selectedGalleryCategory}
+												>
+													{galleryCategories && galleryCategories.length > 0 ? (
+														galleryCategories.map(category => (
+															<MenuItem key={category._id} value={category._id}>
+																{category.title}
+															</MenuItem>
+														))
+													) : (
+														<MenuItem disabled value="">
+															No gallery categories available. Create a category first.
+														</MenuItem>
+													)}
+												</Select>
+												{!selectedGalleryCategory && (
+													<FormHelperText error>
+														Gallery category is required
+													</FormHelperText>
+												)}
+											</FormControl>
+										)}
+										
 										<TextField
 											label="Title"
 											fullWidth
@@ -1375,24 +1533,31 @@ const AdminDashboard = () => {
 										{/* File Upload Section */}
 										<Box sx={{ mt: 2, mb: 2 }}>
 											<Typography variant="subtitle1" gutterBottom>
-												Upload File
+												{contentForm.type === 'gallery' ? 'Upload Images' : 'Upload File'}
 											</Typography>
-											<Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+											<Box sx={{ display: 'flex', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
 												<Button
 													variant="contained"
 													component="label"
 													startIcon={<CloudUploadIcon />}
 													sx={{ mr: 2 }}
 												>
-													Choose File
+													{contentForm.type === 'gallery' ? 'Choose Images' : 'Choose File'}
 													<input
 														type="file"
 														id="file-upload"
 														hidden
+														multiple={contentForm.type === 'gallery'}
+														accept={contentForm.type === 'gallery' ? 'image/*' : undefined}
 														onChange={handleContentFileChange}
 													/>
 												</Button>
-												{contentForm.file && (
+												{contentForm.type === 'gallery' && selectedFiles && selectedFiles.length > 0 && (
+													<Typography variant="body2">
+														{selectedFiles.length} files selected
+													</Typography>
+												)}
+												{contentForm.type !== 'gallery' && contentForm.file && (
 													<Typography variant="body2">
 														{contentForm.file.name}
 													</Typography>
@@ -1400,7 +1565,47 @@ const AdminDashboard = () => {
 											</Box>
 											
 											{/* File Preview */}
-											{contentForm.filePreview && (
+											{contentForm.type === 'gallery' && selectedFiles && selectedFiles.length > 0 && (
+												<Box sx={{ mt: 2, mb: 2 }}>
+													<Typography variant="subtitle2" gutterBottom>
+														Selected Images Preview:
+													</Typography>
+													<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, maxHeight: '200px', overflowY: 'auto' }}>
+														{Array.from(selectedFiles).slice(0, 6).map((file, index) => (
+															<Box key={index} sx={{ position: 'relative' }}>
+																<img 
+																	src={URL.createObjectURL(file)} 
+																	alt={`Preview ${index + 1}`} 
+																	style={{ 
+																		width: '80px', 
+																		height: '80px',
+																		objectFit: 'cover',
+																		borderRadius: '4px',
+																		border: '1px solid #ddd'
+																	}} 
+																/>
+															</Box>
+														))}
+														{selectedFiles.length > 6 && (
+															<Box sx={{ 
+																width: '80px', 
+																height: '80px',
+																display: 'flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																borderRadius: '4px',
+																border: '1px solid #ddd',
+																bgcolor: 'grey.100'
+															}}>
+																<Typography variant="caption">
+																	+{selectedFiles.length - 6}
+																</Typography>
+															</Box>
+														)}
+													</Box>
+												</Box>
+											)}
+											{contentForm.type !== 'gallery' && contentForm.filePreview && (
 												<Box sx={{ mt: 2, mb: 2, textAlign: 'center' }}>
 													<img 
 														src={contentForm.filePreview} 
@@ -1416,15 +1621,41 @@ const AdminDashboard = () => {
 											)}
 										</Box>
 										
+										{/* Upload Progress for Bulk Gallery Upload */}
+										{contentForm.type === 'gallery' && uploadProgress.length > 0 && (
+											<Box sx={{ mt: 2, mb: 2 }}>
+												<Typography variant="subtitle2" gutterBottom>
+													Upload Progress:
+												</Typography>
+												{uploadProgress.map((progress, index) => (
+													<Box key={index} sx={{ mb: 1 }}>
+														<Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+															<Typography variant="caption" sx={{ minWidth: '150px', mr: 1 }}>
+																{progress.fileName}
+															</Typography>
+															<Typography variant="caption" color={progress.status === 'success' ? 'success.main' : progress.status === 'error' ? 'error.main' : 'text.secondary'}>
+																{progress.status === 'success' ? 'Uploaded' : progress.status === 'error' ? 'Failed' : `${progress.progress}%`}
+															</Typography>
+														</Box>
+														<LinearProgress 
+															variant="determinate" 
+															value={progress.progress} 
+															color={progress.status === 'success' ? 'success' : progress.status === 'error' ? 'error' : 'primary'}
+														/>
+													</Box>
+												))}
+											</Box>
+										)}
+										
 										<Button
 											variant="contained"
 											color="primary"
 											fullWidth
-											onClick={handleAddContent}
-											disabled={loading || !contentForm.type || !contentForm.title}
+											onClick={contentForm.type === 'gallery' ? handleBulkGalleryUpload : handleAddContent}
+											disabled={loading || !contentForm.type || !contentForm.title || (contentForm.type === 'gallery' && (!selectedGalleryCategory || !selectedFiles || selectedFiles.length === 0))}
 											sx={{ mt: 2 }}
 										>
-											{loading ? "Adding..." : "Add Content"}
+											{loading ? "Uploading..." : contentForm.type === 'gallery' ? `Upload ${selectedFiles?.length || 0} Images` : "Add Content"}
 										</Button>
 									</Paper>
 								</Grid>

@@ -11,7 +11,7 @@ const API = axios.create({
 // Function to keep backend awake
 const keepBackendAwake = () => {
 	console.log("Pinging backend to keep it awake");
-	axios.get("https://mycollegesitebackend.onrender.com")
+	axios.get("https://mycollegesitebackend.onrender.com/health")
 		.then(() => console.log("Backend ping successful"))
 		.catch(error => console.log("Backend ping failed, but this is okay"));
 };
@@ -185,22 +185,16 @@ export const adminAPI = {
 	updateAdmission: (id, data) => API.put(`/admin/admissions/${id}`, data),
 
 	// Result Management
-	uploadResults: (formData) => API.post("/admin/results/upload", formData),
-	addResult: (data) => API.post("/admin/results", data),
-	getResults: (params) => {
-		const queryParams = new URLSearchParams();
-		if (params?.studentId) queryParams.append('studentId', params.studentId);
-		if (params?.courseId) queryParams.append('courseId', params.courseId);
-		if (params?.semester) queryParams.append('semester', params.semester);
-		
-		const queryString = queryParams.toString();
-		const url = queryString ? `/admin/results?${queryString}` : '/admin/results';
-		
-		return API.get(url);
-	},
-	updateResult: (id, data) => API.put(`/admin/results/${id}`, data),
-	deleteResult: (id) => API.delete(`/admin/results/${id}`),
-	downloadResultTemplate: () => API.get('/admin/results/template', { responseType: 'blob' }),
+	uploadResults: (formData) => {
+        return API.post('/admin/results/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
+    addResult: (data) => API.post('/admin/results', data),
+    getResults: (params = {}) => API.get('/admin/results', { params }),
+    updateResult: (id, data) => API.put(`/admin/results/${id}`, data),
+    deleteResult: (id) => API.delete(`/admin/results/${id}`),
+    downloadResultTemplate: () => API.get('/admin/results/template', { responseType: 'blob' }),
 
 	// Payment Management
 	getPayments: () => API.get("/admin/payments"),
@@ -212,10 +206,26 @@ export const adminAPI = {
 
 	// File Upload
 	uploadFile: (formData) => {
-		console.log("Sending file upload request with FormData");
-		// Don't set Content-Type header, let the browser set it with the boundary
-		return API.post("/admin/upload", formData);
+		return API.post('/admin/upload', formData, {
+			headers: { 'Content-Type': 'multipart/form-data' },
+		});
 	},
+
+	// Gallery Management
+	uploadGalleryImage: (formData, onUploadProgress) => {
+		return API.post('/admin/gallery/upload', formData, {
+			headers: { 'Content-Type': 'multipart/form-data' },
+			onUploadProgress: (progressEvent) => {
+				if (onUploadProgress && progressEvent.lengthComputable) {
+					onUploadProgress(progressEvent);
+				}
+			}
+		});
+	},
+	getGalleryCategories: () => API.get('/admin/gallery/categories'),
+	addGalleryCategory: (data) => API.post('/admin/gallery/categories', data),
+	updateGalleryCategory: (id, data) => API.put(`/admin/gallery/categories/${id}`, data),
+	deleteGalleryCategory: (id) => API.delete(`/admin/gallery/categories/${id}`),
 };
 
 // Faculty API

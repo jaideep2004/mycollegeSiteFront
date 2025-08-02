@@ -95,15 +95,27 @@ const ResultsManagement = ({ students, courses }) => {
         setLoading(true);
         const formData = new FormData();
         formData.append('resultsFile', selectedFile);
+        formData.append('strictMatch', 'true'); // Add flag for strict matching
 
         try {
             // Call API to upload results
             const response = await api.admin.uploadResults(formData);
             
             // Show summary of upload
-            const { successCount, errorCount, errors } = response.data;
-            if (errorCount > 0) {
-                setUploadError(`Upload completed with ${errorCount} errors. Check console for details.`);
+            const { successCount, errorCount, errors, unmatchedEntries } = response.data;
+            
+            if (errorCount > 0 || (unmatchedEntries && unmatchedEntries.length > 0)) {
+                let errorMessage = `Upload completed with ${errorCount} errors.`;
+                
+                if (unmatchedEntries && unmatchedEntries.length > 0) {
+                    errorMessage += `\n\n${unmatchedEntries.length} entries could not be matched to existing students/courses.`;
+                    errorMessage += '\nPlease ensure student names and course titles exactly match the records in the system.';
+                    
+                    // Log unmatched entries for debugging
+                    console.warn('Unmatched entries:', unmatchedEntries);
+                }
+                
+                setUploadError(errorMessage);
                 console.error('Upload errors:', errors);
             } else {
                 showSuccessToast(`Successfully uploaded ${successCount} results`);
@@ -167,6 +179,20 @@ const ResultsManagement = ({ students, courses }) => {
             console.error('Add result error:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Handle delete result
+    const handleDeleteResult = async (resultId) => {
+        if (window.confirm('Are you sure you want to delete this result?')) {
+            try {
+                await api.admin.deleteResult(resultId);
+                showSuccessToast('Result deleted successfully');
+                await fetchResults();
+            } catch (error) {
+                console.error('Error deleting result:', error);
+                setUploadError('Failed to delete result');
+            }
         }
     };
 
